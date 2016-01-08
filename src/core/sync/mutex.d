@@ -77,6 +77,7 @@ class Mutex :
 
             if( pthread_mutex_init( &m_hndl, &attr ) )
                 throw new SyncError( "Unable to initialize mutex" );
+            
         }
         m_proxy.link = this;
         this.__monitor = &m_proxy;

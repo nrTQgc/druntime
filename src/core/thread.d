@@ -1141,8 +1141,16 @@ class Thread
         {
             return sm_this;
         }
+        /*else version( NetBSD )
+        {
+            Thread t;
+            t.sm_this = sm_this;
+            return 
+        }*/
         else version( Posix )
         {
+            import core.stdc.stdio;
+            printf("====%i\n", Thread.sizeof);  
             auto t = cast(Thread) pthread_getspecific( sm_this );
             return t;
         }
@@ -1464,6 +1472,8 @@ private:
         else version( Posix )
         {
             pthread_setspecific( sm_this, cast(void*) t );
+            import core.stdc.stdio;
+            printf("sm_this <<<< %i\n", *cast(int*)cast(void*)&sm_this);
         }
         else version( Windows )
         {
@@ -1946,9 +1956,9 @@ extern (C) void thread_init()
     //       thread_init is being processed.  However, since no memory should
     //       exist to be scanned at this point, it is sufficient for these
     //       functions to detect the condition and return immediately.
-
+ 
     Thread.initLocks();
-
+ 
     version( OSX )
     {
     }
@@ -1993,20 +2003,23 @@ extern (C) void thread_init()
         sigusr2.sa_handler = &thread_resumeHandler;
         // NOTE: We want to ignore all signals while in this handler, so fill
         //       sa_mask to indicate this.
+
         status = sigfillset( &sigusr2.sa_mask );
         assert( status == 0 );
-
         status = sigaction( suspendSignalNumber, &sigusr1, null );
         assert( status == 0 );
-
         status = sigaction( resumeSignalNumber, &sigusr2, null );
         assert( status == 0 );
 
         status = sem_init( &suspendCount, 0, 0 );
         assert( status == 0 );
-
+        import core.stdc.stdio;
+          //  printf("before <%i\n", pthread_getspecific (Thread.sm_this));  
         status = pthread_key_create( &Thread.sm_this, null );
+            
+            printf("====<<<<<<<<<%i\n", Thread.sm_this);  
         assert( status == 0 );
+            //printf("try get:  %i\n", pthread_getspecific (Thread.sm_this));
     }
     else version( Windows )
     {
@@ -2032,6 +2045,8 @@ extern (C) void thread_term()
     else version( Posix )
     {
         pthread_key_delete( Thread.sm_this );
+            import core.stdc.stdio;
+            printf("term: %i\n", *cast(int*)cast(void*)&Thread.sm_this);  
     }
     else version( Windows )
     {
@@ -3207,6 +3222,7 @@ extern (C)
 nothrow:
     version (CRuntime_Glibc) int pthread_getattr_np(pthread_t thread, pthread_attr_t* attr);
     version (FreeBSD) int pthread_attr_get_np(pthread_t thread, pthread_attr_t* attr);
+    version (NetBSD) int pthread_attr_get_np(pthread_t thread, pthread_attr_t* attr);
     version (Solaris) int thr_stksegment(stack_t* stk);
     version (CRuntime_Bionic) int pthread_getattr_np(pthread_t thid, pthread_attr_t* attr);
 }
@@ -3324,6 +3340,17 @@ private void* getStackBottom() nothrow
         return addr + size;
     }
     else version (FreeBSD)
+    {
+        pthread_attr_t attr;
+        void* addr; size_t size;
+
+        pthread_attr_init(&attr);
+        pthread_attr_get_np(pthread_self(), &attr);
+        pthread_attr_getstack(&attr, &addr, &size);
+        pthread_attr_destroy(&attr);
+        return addr + size;
+    }
+    else version (NetBSD)
     {
         pthread_attr_t attr;
         void* addr; size_t size;
@@ -4666,6 +4693,7 @@ private:
         {
             version (Posix) import core.sys.posix.sys.mman; // mmap
             version (FreeBSD) import core.sys.freebsd.sys.mman : MAP_ANON;
+            version (NetBSD) import core.sys.netbsd.sys.mman : MAP_ANON;
             version (CRuntime_Glibc) import core.sys.linux.sys.mman : MAP_ANON;
             version (OSX) import core.sys.osx.sys.mman : MAP_ANON;
 

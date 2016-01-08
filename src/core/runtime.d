@@ -407,6 +407,8 @@ extern (C) bool runModuleUnitTests()
         import core.sys.osx.execinfo;
     else version( FreeBSD )
         import core.sys.freebsd.execinfo;
+    else version( NetBSD )
+        import core.sys.netbsd.execinfo;
     else version( Windows )
         import core.sys.windows.stacktrace;
     else version( Solaris )
@@ -434,12 +436,19 @@ extern (C) bool runModuleUnitTests()
         sigfillset( &action.sa_mask ); // block other signals
         action.sa_flags = SA_SIGINFO | SA_RESETHAND;
         action.sa_sigaction = &unittestSegvHandler;
+        //import core.stdc.stdio;
+        //printf("sig handler\n");
         sigaction( SIGSEGV, &action, &oldseg );
+        //printf("sig handler2\n");
         sigaction( SIGBUS, &action, &oldbus );
+        //printf("sig handler3\n");
         scope( exit )
         {
+            //printf("sig handler4\n");
             sigaction( SIGSEGV, &oldseg, null );
+            //printf("sig handler5\n");
             sigaction( SIGBUS, &oldbus, null );
+            //printf("sig handler6\n");
         }
     }
 
@@ -489,6 +498,8 @@ Throwable.TraceInfo defaultTraceHandler( void* ptr = null )
         import core.sys.osx.execinfo;
     else version( FreeBSD )
         import core.sys.freebsd.execinfo;
+    else version( NetBSD )
+        import core.sys.netbsd.execinfo;
     else version( Windows )
         import core.sys.windows.stacktrace;
     else version( Solaris )
@@ -639,6 +650,18 @@ Throwable.TraceInfo defaultTraceHandler( void* ptr = null )
                     }
                 }
                 else version( FreeBSD )
+                {
+                    // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
+                    auto bptr = cast(char*) memchr( buf.ptr, '<', buf.length );
+                    auto eptr = cast(char*) memchr( buf.ptr, '+', buf.length );
+
+                    if( bptr++ && eptr )
+                    {
+                        symBeg = bptr - buf.ptr;
+                        symEnd = eptr - buf.ptr;
+                    }
+                }
+                else version( NetBSD )
                 {
                     // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
                     auto bptr = cast(char*) memchr( buf.ptr, '<', buf.length );

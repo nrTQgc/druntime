@@ -36,6 +36,10 @@ version (FreeBSD)
 {
     import core.stdc.fenv;
 }
+version (NetBSD)
+{
+    import core.stdc.fenv;
+}
 
 extern (C) void _d_monitor_staticctor();
 extern (C) void _d_monitor_staticdtor();
@@ -324,6 +328,21 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
             fldcw   fpucw;
         }
     }
+    version (NetBSD) version (D_InlineAsm_X86)
+    {
+        /*
+         * NetBSD/i386 sets the FPU precision mode to 53 bit double.
+         * Make it 64 bit extended.
+         */
+        ushort fpucw;
+        asm
+        {
+            fstsw   fpucw;
+            or      fpucw, 0b11_00_111111; // 11: use 64 bit extended-precision
+                                           // 111111: mask all FP exceptions
+            fldcw   fpucw;
+        }
+    }
     version (CRuntime_Microsoft)
     {
         init_msvc();
@@ -401,6 +420,8 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
         size_t totalArgsLength = 0;
         foreach(i, ref arg; args)
         {
+            //import core.stdc.stdio;
+            //printf("copy: %s\n", argv[i]);
             arg = argv[i][0 .. strlen(argv[i])];
             totalArgsLength += arg.length;
         }
@@ -440,21 +461,29 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
 
     void tryExec(scope void delegate() dg)
     {
+        import core.stdc.stdio;
+        printf("tryExec 1\n");
         if (trapExceptions)
         {
             try
             {
+                printf("tryExec 2\n");
                 dg();
+                printf("tryExec 3\n");
             }
             catch (Throwable t)
             {
+                printf("tryExec 4\n");
                 _d_print_throwable(t);
+                printf("tryExec 5\n");  
                 result = EXIT_FAILURE;
             }
         }
         else
-        {
+        {  
+            printf("tryExec 6\n");
             dg();
+            printf("tryExec 7\n");
         }
     }
 
@@ -468,16 +497,27 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
     //       thrown during cleanup, however, will abort the cleanup process.
     void runAll()
     {
-        if (rt_init() && runModuleUnitTests())
-            tryExec({ result = mainFunc(args); });
+        import core.stdc.stdio;
+        printf("runAll 1\n");
+        if (rt_init() && runModuleUnitTests()){
+            printf("runAll 2\n"); 
+            tryExec({ 
+               printf("runAll 2.1 %i\n", &mainFunc);
+               result = mainFunc(args); 
+               printf("runAll 2.2\n");
+            });
+            printf("runAll 3\n"); 
+        }
         else
             result = EXIT_FAILURE;
 
         if (!rt_term())
             result = (result == EXIT_SUCCESS) ? EXIT_FAILURE : result;
     }
-
+    printf("runAll 100\n");
     tryExec(&runAll);
+    printf("runAll 101\n");
+
 
     // Issue 10344: flush stdout and return nonzero on failure
     if (.fflush(.stdout) != 0)
