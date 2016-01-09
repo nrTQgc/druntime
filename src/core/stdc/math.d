@@ -825,15 +825,15 @@ else version( NetBSD )
     enum
     {
         ///
-        FP_INFINITE  = 0x01,
+        FP_INFINITE    = 0,
         ///
-        FP_NAN       = 0x02,
+        FP_NAN         = 1,
         ///
-        FP_NORMAL    = 0x04,
+        FP_NORMAL      = 2,
         ///
-        FP_SUBNORMAL = 0x08,
+        FP_SUBNORMAL   = 3,
         ///
-        FP_ZERO      = 0x10,
+        FP_ZERO        = 4,
     }
 
     enum
@@ -846,71 +846,69 @@ else version( NetBSD )
         FP_FAST_FMAL = 0,
     }
 
-    int __fpclassifyd(double);
-    int __fpclassifyf(float);
-    int __fpclassifyl(real);
-    int __isfinitef(float);
-    int __isfinite(double);
-    int __isfinitel(real);
-    int __isinff(float);
-    int __isinfl(real);
-    int __isnanl(real);
-    int __isnormalf(float);
-    int __isnormal(double);
-    int __isnormall(real);
-    int __signbit(double);
-    int __signbitf(float);
-    int __signbitl(real);
+    uint __fpclassifyf(float x);
+    uint __fpclassifyd(double x);
+    uint __fpclassifyl(real x);
 
   extern (D)
   {
     //int fpclassify(real-floating x);
-      ///
+    ///
     int fpclassify(float x)     { return __fpclassifyf(x); }
     ///
     int fpclassify(double x)    { return __fpclassifyd(x); }
     ///
-    int fpclassify(real x)      { return __fpclassifyl(x); }
+    int fpclassify(real x)
+    {
+        return (real.sizeof == double.sizeof)
+            ? __fpclassifyd(x)
+            : __fpclassifyl(x);
+    }
 
     //int isfinite(real-floating x);
     ///
-    int isfinite(float x)       { return __isfinitef(x); }
+    int isfinite(float x)       { return fpclassify(x) >= FP_NORMAL; }
     ///
-    int isfinite(double x)      { return __isfinite(x); }
+    int isfinite(double x)      { return fpclassify(x) >= FP_NORMAL; }
     ///
-    int isfinite(real x)        { return __isfinitel(x); }
+    int isfinite(real x)        { return fpclassify(x) >= FP_NORMAL; }
 
     //int isinf(real-floating x);
     ///
-    int isinf(float x)          { return __isinff(x); }
+    int isinf(float x)          { return fpclassify(x) == FP_INFINITE; }
     ///
-    int isinf(double x)         { return __isinfl(x); }
+    int isinf(double x)         { return fpclassify(x) == FP_INFINITE; }
     ///
-    int isinf(real x)           { return __isinfl(x); }
+    int isinf(real x)           { return fpclassify(x) == FP_INFINITE; }
 
     //int isnan(real-floating x);
     ///
-    int isnan(float x)          { return __isnanl(x); }
+    int isnan(float x)          { return fpclassify(x) == FP_NAN;   }
     ///
-    int isnan(double x)         { return __isnanl(x); }
+    int isnan(double x)         { return fpclassify(x) == FP_NAN;   }
     ///
-    int isnan(real x)           { return __isnanl(x); }
+    int isnan(real x)           { return fpclassify(x) == FP_NAN;   }
 
     //int isnormal(real-floating x);
     ///
-    int isnormal(float x)       { return __isnormalf(x); }
+    int isnormal(float x)       { return fpclassify(x) == FP_NORMAL; }
     ///
-    int isnormal(double x)      { return __isnormal(x); }
+    int isnormal(double x)      { return fpclassify(x) == FP_NORMAL; }
     ///
-    int isnormal(real x)        { return __isnormall(x); }
+    int isnormal(real x)        { return fpclassify(x) == FP_NORMAL; }
 
     //int signbit(real-floating x);
     ///
-    int signbit(float x)        { return __signbitf(x); }
+    int signbit(float x)     { return (cast(short*)&(x))[1] & 0x8000; }
     ///
-    int signbit(double x)       { return __signbit(x); }
+    int signbit(double x)    { return (cast(short*)&(x))[3] & 0x8000; }
     ///
-    int signbit(real x)         { return __signbit(x); }
+    int signbit(real x)
+    {
+        return (real.sizeof == double.sizeof)
+            ? (cast(short*)&(x))[3] & 0x8000
+            : (cast(short*)&(x))[4] & 0x8000;
+    }
   }
 }
 else version( Solaris )
@@ -1550,7 +1548,7 @@ else version( FreeBSD )
   }
   else
   {
-      ///
+    ///
     real    acosl(real x);
     ///
     real    asinl(real x);
@@ -1952,113 +1950,68 @@ else version( FreeBSD )
 }
 else version( NetBSD )
 {
-  /*version (none) // < 8-CURRENT
-  {
-    real    acosl(real x) { return acos(x); }
-    real    asinl(real x) { return asin(x); }
-    real    atanl(real x) { return atan(x); }
-    real    atan2l(real y, real x) { return atan2(y, x); }
-    real    cosl(real x) { return cos(x); }
-    real    sinl(real x) { return sin(x); }
-    real    tanl(real x) { return tan(x); }
-    real    exp2l(real x) { return exp2(x); }
-    real    frexpl(real value, int* exp) { return frexp(value, exp); }
-    int     ilogbl(real x) { return ilogb(x); }
-    real    ldexpl(real x, int exp) { return ldexp(x, exp); }
-    real    logbl(real x) { return logb(x); }
-    //real    modfl(real value, real *iptr); // nontrivial conversion
-    real    scalbnl(real x, int n) { return scalbn(x, n); }
-    real    scalblnl(real x, c_long n) { return scalbln(x, n); }
-    real    fabsl(real x) { return fabs(x); }
-    real    hypotl(real x, real y) { return hypot(x, y); }
-    real    sqrtl(real x) { return sqrt(x); }
-    real    ceill(real x) { return ceil(x); }
-    real    floorl(real x) { return floor(x); }
-    real    nearbyintl(real x) { return nearbyint(x); }
-    real    rintl(real x) { return rint(x); }
-    c_long  lrintl(real x) { return lrint(x); }
-    real    roundl(real x) { return round(x); }
-    c_long  lroundl(real x) { return lround(x); }
-    long    llroundl(real x) { return llround(x); }
-    real    truncl(real x) { return trunc(x); }
-    real    fmodl(real x, real y) { return fmod(x, y); }
-    real    remainderl(real x, real y) { return remainder(x, y); }
-    real    remquol(real x, real y, int* quo) { return remquo(x, y, quo); }
-    real    copysignl(real x, real y) { return copysign(x, y); }
-//  double  nan(char* tagp);
-//  float   nanf(char* tagp);
-//  real    nanl(char* tagp);
-    real    nextafterl(real x, real y) { return nextafter(x, y); }
-    real    nexttowardl(real x, real y) { return nexttoward(x, y); }
-    real    fdiml(real x, real y) { return fdim(x, y); }
-    real    fmaxl(real x, real y) { return fmax(x, y); }
-    real    fminl(real x, real y) { return fmin(x, y); }
-    real    fmal(real x, real y, real z) { return fma(x, y, z); }
-  }
-  else
-  {*/
-      ///
-    real    acosl(real x);
     ///
-    real    asinl(real x);
+    real    acosl(real x) { return .acosl(x); }
     ///
-    real    atanl(real x);
+    real    asinl(real x) { return .asinl(x); }
     ///
-    real    atan2l(real y, real x);
+    real    atanl(real x) { return .atanl(x); }
     ///
-    real    cosl(real x);
+    real    atan2l(real y, real x)  { return .atan2l(x, y); }
     ///
-    real    sinl(real x);
+    real    cosl(real x) { return .cosl(x); }
     ///
-    real    tanl(real x);
+    real    sinl(real x) { return .sinl(x); }
     ///
-    real    exp2l(real x);
+    real    tanl(real x) { return .tanl(x); }
     ///
-    real    frexpl(real value, int* exp);
+    real    exp2l(real x) { return .exp2l(x); }
     ///
-    int     ilogbl(real x);
+    real    frexpl(real value, int* exp) { return .frexpl(value, exp); }
     ///
-    real    ldexpl(real x, int exp);
+    int     ilogbl(real x) { return .ilogbl(x); }
     ///
-    real    logbl(real x);
+    real    ldexpl(real x, int exp) { return .ldexpl(x, exp); }
     ///
-    real    modfl(real value, real *iptr);
+    real    logbl(real x) { return .logbl(x); }
     ///
-    real    scalbnl(real x, int n);
+    real    modfl(real value, real *iptr) { return .modfl(value, iptr); }
     ///
-    real    scalblnl(real x, c_long n);
+    real    scalbnl(real x, int n) { return .scalbnl(x, n); }
     ///
-    real    fabsl(real x);
+    real    scalblnl(real x, c_long n) { return .scalblnl(x, n); }
     ///
-    real    hypotl(real x, real y);
+    real    fabsl(real x) { return .fabsl(x); }
     ///
-    real    sqrtl(real x);
+    real    hypotl(real x, real y) { return .hypotl(x, y); }
     ///
-    real    ceill(real x);
+    real    sqrtl(real x) { return .sqrtl(x); }
     ///
-    real    floorl(real x);
+    real    ceill(real x) { return .ceill(x); }
     ///
-    real    nearbyintl(real x);
+    real    floorl(real x) { return .floorl(x); }
     ///
-    real    rintl(real x);
+    real    nearbyintl(real x) { return .nearbyintl(x); }
     ///
-    c_long  lrintl(real x);
+    real    rintl(real x) { return .rintl(x); }
     ///
-    real    roundl(real x);
+    c_long  lrintl(real x) {  return llrintl(x); }
     ///
-    c_long  lroundl(real x);
+    real    roundl(real x) { return .roundl(x); }
     ///
-    long    llroundl(real x);
+    c_long  lroundl(real x) { return .llround(x); }
     ///
-    real    truncl(real x);
+    long    llroundl(real x) { return .llroundl(x); }
     ///
-    real    fmodl(real x, real y);
+    real    truncl(real x) { return .truncl(x); }
     ///
-    real    remainderl(real x, real y);
+    real    fmodl(real x, real y) { return .fmodl(x, y); }
     ///
-    real    remquol(real x, real y, int* quo);
+    real    remainderl(real x, real y) { return .remainderl(x, y);  }
     ///
-    real    copysignl(real x, real y);
+    real    remquol(real x, real y, int* quo) {  return .remquol(x, y, quo);  }
+    ///
+    real    copysignl(real x, real y)  { return .copysignl(x, y); };
     ///
     double  nan(char* tagp);
     ///
@@ -2066,18 +2019,18 @@ else version( NetBSD )
     ///
     real    nanl(char* tagp);
     ///
-    real    nextafterl(real x, real y);
+    real    nextafterl(real x, real y) { return .nextafterl(x, y); }
     ///
-    real    nexttowardl(real x, real y);
+    real    nexttowardl(real x, real y) { return .nexttowardl(x, y); }
     ///
-    real    fdiml(real x, real y);
+    real    fdiml(real x, real y) { return .fdiml(x, y); }
     ///
-    real    fmaxl(real x, real y);
+    real    fmaxl(real x, real y) { return .fmaxl(x, y); }
     ///
-    real    fminl(real x, real y);
+    real    fminl(real x, real y) { return .fminl(x, y); }
     ///
-    real    fmal(real x, real y, real z);
-  //}
+    real    fmal(real x, real y, real z) { return .fmal(x, y, z); }
+ 
   ///
     double  acos(double x);
     ///
@@ -2118,49 +2071,49 @@ else version( NetBSD )
     ///
     float   acoshf(float x);
     ///
-    real    acoshl(real x) { return acosh(x); }
+    real    acoshl(real x) { return .acoshl(x); }
 
     ///
     double  asinh(double x);
     ///
     float   asinhf(float x);
     ///
-    real    asinhl(real x) { return asinh(x); }
+    real    asinhl(real x) { return .asinhl(x); }
 
     ///
     double  atanh(double x);
     ///
     float   atanhf(float x);
     ///
-    real    atanhl(real x) { return atanh(x); }
+    real    atanhl(real x) { return .atanhl(x); }
 
     ///
     double  cosh(double x);
     ///
     float   coshf(float x);
     ///
-    real    coshl(real x) { return cosh(x); }
+    real    coshl(real x) { return .coshl(x); }
 
     ///
     double  sinh(double x);
     ///
     float   sinhf(float x);
     ///
-    real    sinhl(real x) { return sinh(x); }
+    real    sinhl(real x) { return .sinh(x); }
 
     ///
     double  tanh(double x);
     ///
     float   tanhf(float x);
     ///
-    real    tanhl(real x) { return tanh(x); }
+    real    tanhl(real x) { return .tanhl(x); }
 
     ///
     double  exp(double x);
     ///
     float   expf(float x);
     ///
-    real    expl(real x) { return exp(x); }
+    real    expl(real x) { return .expl(x); }
 
     ///
     double  exp2(double x);
@@ -2172,7 +2125,7 @@ else version( NetBSD )
     ///
     float   expm1f(float x);
     ///
-    real    expm1l(real x) { return expm1(x); }
+    real    expm1l(real x) { return .expm1(x); }
 
     ///
     double  frexp(double value, int* exp);
@@ -2194,21 +2147,21 @@ else version( NetBSD )
     ///
     float   logf(float x);
     ///
-    real    logl(real x) { return log(x); }
+    real    logl(real x) { return .logl(x); }
 
     ///
     double  log10(double x);
     ///
     float   log10f(float x);
     ///
-    real    log10l(real x) { return log10(x); }
+    real    log10l(real x) { return .log10l(x); }
 
     ///
     double  log1p(double x);
     ///
     float   log1pf(float x);
     ///
-    real    log1pl(real x) { return log1p(x); }
+    real    log1pl(real x) { return .log1pl(x); }
 
     private enum real ONE_LN2 = 1 / 0x1.62e42fefa39ef358p-1L;
     ///
@@ -2243,7 +2196,7 @@ else version( NetBSD )
     ///
     float   cbrtf(float x);
     ///
-    real    cbrtl(real x) { return cbrt(x); }
+    real    cbrtl(real x) { return .cbrtl(x); }
 
     ///
     double  fabs(double x);
@@ -2260,7 +2213,7 @@ else version( NetBSD )
     ///
     float   powf(float x, float y);
     ///
-    real    powl(real x, real y) { return pow(x, y); }
+    real    powl(real x, real y) { return .powl(x, y); }
 
     ///
     double  sqrt(double x);
@@ -2272,28 +2225,28 @@ else version( NetBSD )
     ///
     float   erff(float x);
     ///
-    real    erfl(real x) { return erf(x); }
+    real    erfl(real x) { return .erfl(x); }
 
     ///
     double  erfc(double x);
     ///
     float   erfcf(float x);
     ///
-    real    erfcl(real x) { return erfc(x); }
+    real    erfcl(real x) { return .erfcl(x); }
 
     ///
     double  lgamma(double x);
     ///
     float   lgammaf(float x);
     ///
-    real    lgammal(real x) { return lgamma(x); }
+    real    lgammal(real x) { return .lgammal(x); }
 
     ///
     double  tgamma(double x);
     ///
     float   tgammaf(float x);
     ///
-    real    tgammal(real x) { return tgamma(x); }
+    real    tgammal(real x) { return .tgammal(x); }
 
     ///
     double  ceil(double x);
@@ -2325,7 +2278,7 @@ else version( NetBSD )
     ///
     long    llrintf(float x);
     ///
-    long    llrintl(real x) { return llrint(x); }
+    long    llrintl(real x){ return .llrintl(x); }
 
     ///
     double  round(double x);
