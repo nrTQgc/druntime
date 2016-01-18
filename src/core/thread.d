@@ -594,7 +594,6 @@ class Thread
     // General Actions
     ///////////////////////////////////////////////////////////////////////////
 
-
     /**
      * Starts the thread and invokes the function or delegate passed upon
      * construction.
@@ -892,6 +891,12 @@ class Thread
      */
     __gshared const int PRIORITY_DEFAULT;
 
+     version(NetBSD)
+     {
+        //NetBSD does not support priority for default policy
+        // and it is not possible change policy without root access
+        int fakePriority = int.max;
+     }
 
     /**
      * Gets the scheduling priority for the associated thread.
@@ -907,6 +912,10 @@ class Thread
         version( Windows )
         {
             return GetThreadPriority( m_hndl );
+        }
+        else version(NetBSD)
+        {
+           return fakePriority==int.max? PRIORITY_DEFAULT : fakePriority;
         }
         else version( Posix )
         {
@@ -972,6 +981,10 @@ class Thread
             if (priocntl(idtype_t.P_LWPID, P_MYID, PC_SETPARMS, &pcparm) == -1)
                 throw new ThreadException( "Unable to set scheduling class" );
         }
+        else version(NetBSD)
+        {
+           fakePriority = val;
+        }
         else version( Posix )
         {
             static if(__traits(compiles, pthread_setschedprio))
@@ -988,6 +1001,7 @@ class Thread
                 // NOTE: pthread_setschedprio is not implemented on OSX or FreeBSD, so use
                 //       the more complicated get/set sequence below.
                 int         policy;
+                
                 sched_param param;
 
                 if (auto err = pthread_getschedparam(m_addr, &policy, &param))
@@ -997,6 +1011,7 @@ class Thread
                     throw new ThreadException("Unable to set thread priority");
                 }
                 param.sched_priority = val;
+                 
                 if (auto err = pthread_setschedparam(m_addr, policy, &param))
                 {
                     // ignore error if thread is not running => Bugzilla 8960
@@ -3207,6 +3222,7 @@ extern (C)
 nothrow:
     version (CRuntime_Glibc) int pthread_getattr_np(pthread_t thread, pthread_attr_t* attr);
     version (FreeBSD) int pthread_attr_get_np(pthread_t thread, pthread_attr_t* attr);
+    version (NetBSD) int pthread_attr_get_np(pthread_t thread, pthread_attr_t* attr);
     version (Solaris) int thr_stksegment(stack_t* stk);
     version (CRuntime_Bionic) int pthread_getattr_np(pthread_t thid, pthread_attr_t* attr);
 }
@@ -3324,6 +3340,17 @@ private void* getStackBottom() nothrow
         return addr + size;
     }
     else version (FreeBSD)
+    {
+        pthread_attr_t attr;
+        void* addr; size_t size;
+
+        pthread_attr_init(&attr);
+        pthread_attr_get_np(pthread_self(), &attr);
+        pthread_attr_getstack(&attr, &addr, &size);
+        pthread_attr_destroy(&attr);
+        return addr + size;
+    }
+    else version (NetBSD)
     {
         pthread_attr_t attr;
         void* addr; size_t size;
@@ -3902,6 +3929,13 @@ private
 version( LDC )
 {
     version( OSX )
+    {
+        version( ARM ) version = CheckFiberMigration;
+        version( AArch64 ) version = CheckFiberMigration;
+        version( X86 ) version = CheckFiberMigration;
+        version( X86_64 ) version = CheckFiberMigration;
+    }
+    version( NetBSD )
     {
         version( ARM ) version = CheckFiberMigration;
         version( AArch64 ) version = CheckFiberMigration;
@@ -4666,6 +4700,7 @@ private:
         {
             version (Posix) import core.sys.posix.sys.mman; // mmap
             version (FreeBSD) import core.sys.freebsd.sys.mman : MAP_ANON;
+            version (NetBSD) import core.sys.netbsd.sys.mman : MAP_ANON;
             version (CRuntime_Glibc) import core.sys.linux.sys.mman : MAP_ANON;
             version (OSX) import core.sys.osx.sys.mman : MAP_ANON;
 
